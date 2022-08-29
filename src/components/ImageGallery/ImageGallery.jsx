@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import styles from './image-gallery.module.scss';
 import PropTypes from 'prop-types';
@@ -9,98 +9,90 @@ import Button from 'components/Button/Button';
 import Loader from 'components/Loader/Loader';
 import Modal from 'components/Modal/Modal';
 
-class ImageGallery extends Component {
-    state = {
-        image: null,
-        loading: false,
-        page: 1,
-        total: null,
-        largePageSrc: '',
+function ImageGallery({ searchImages, page, onLoadMore }) {
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(null);
+  const [largePageSrc, setLargePageSrc] = useState('');
+  const [error, setError] = useState(null);
 
-    };
-    async componentDidUpdate(prevProps, prevState) {
-        const { page } = this.state;
-        const prevImg = prevProps.searchImages;
-        const currentName = this.props.searchImages;
-    
-        if (prevImg !== currentName) {
-          try {
-            this.setState({ page: 1, loading: true });
-            const responce = await Pixabay(page, currentName);
-            this.setState({
-              images: responce.data.hits,
-              total: responce.data.total,
-            });
-          } catch (error) {
-            this.setState({ error });
-            console.log(error);
-          } finally {
-            setTimeout(() => {
-              this.setState({ loading: false });
-            }, 1000);
-          }
-        }
-    
-        if (this.state.page !== prevState.page && this.state.page !== 1) {
-          try {
-            this.setState({ loading: true });
-            const responce = await Pixabay(page, currentName);
-            this.setState({
-              images: [...prevState.images, ...responce.data.hits],
-            });
-          } catch (error) {
-            this.setState({ error });
-            console.log(error);
-          } finally {
-            this.setState({ loading: false });
-          }
-        }
-      }
-    
-      loadMore = () => {
-        const nextPage = this.state.page + 1;
-        this.setState({ page: nextPage });
-      };
-    
-      modalOpen = largePageSrc => {
-        this.setState({ largePageSrc });
-      };
-    
-      render() {
-        const { images, loading, page, total, largePageSrc } = this.state;
-    
-        return (
-          <>
-            {loading && <Loader />}
-            {images && (
-              <>
-                <ul className={styles.gallery}>
-                  {images.map(({ id, webformatURL, largeImageURL }) => (
-                    <ImageGalleryItem
-                      key={nanoid()}
-                      id={id}
-                      url={webformatURL}
-                      largeUrl={largeImageURL}
-                      onClickFunc={this.modalOpen}
-                    />
-                  ))}
-                </ul>
-                {12 * page <= total && (
-                  <Button value={'Load more'} onBtnClick={this.loadMore} />
-                )}
-              </>
-            )}
-            {largePageSrc && (
-              <Modal src={largePageSrc} onModalFunc={this.modalOpen} />
-            )}
-          </>
-        );
+  useEffect(() => {
+    if (searchImages && searchImages !== '') {
+      fetchApi();
+    }
+
+    async function fetchApi() {
+      try {
+        setLoading(true);
+        const { data } = await Pixabay(page, searchImages);
+        setImages(data.hits);
+        setTotal(data.total);
+      } catch (error) {
+        setError(error);
+        console.log(error);
+      } finally {
+        setLoading(false);
       }
     }
-    
-    ImageGallery.propTypes = {
-      searchImages: PropTypes.string,
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchImages]);
+
+    useEffect(() => {
+      if (searchImages && searchImages !== '' && page !== 1) {
+        fetchApi();
+      }
+  
+      async function fetchApi() {
+        try {
+          setLoading(true);
+          const { data } = await Pixabay(page, searchImages);
+          setImages([...images, ...data.hits]);
+          setTotal(data.total);
+        } catch (er) {
+          setError(er);
+          console.log(error);
+        } finally {
+          setLoading(false);
+        }
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page]);
+  
+    const modalOpen = largePageSrc => {
+      setLargePageSrc(largePageSrc);
     };
+  
+    return (
+      <>
+        {loading && <Loader />}
+        {images && (
+          <>
+            <ul className={styles.gallery}>
+              {images.map(({ id, webformatURL, largeImageURL }) => (
+                <ImageGalleryItem
+                  key={nanoid()}
+                  id={id}
+                  url={webformatURL}
+                  largeUrl={largeImageURL}
+                  onClickFunc={modalOpen}
+                />
+              ))}
+            </ul>
+            {12 * page <= total && (
+              <Button value={'Load more'} onBtnClick={onLoadMore} />
+            )}
+          </>
+        )}
+        {largePageSrc && <Modal src={largePageSrc} onModalFunc={modalOpen} />}
+      </>
+    );
+  }
+
+  
+  export default ImageGallery;
 
 
-export default ImageGallery;
+  ImageGallery.propTypes = {
+    searchImages: PropTypes.string,
+  };
